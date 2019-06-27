@@ -1,37 +1,247 @@
 ################################################################################
-# File: Pax6Cornea_GSE29402_Contrast.R					                               #
+# File: Pax6Epi_PCO_BuildMaster_Tables.R					                             #
 # Author: Adam Faranda			                                     				       #
-# Created: May 17, 2019							                                           #
-# Purpose: Compare Corneal Genes from GSE29402 to Genes that are differentially#
-#          regulated in a pax6 heterozygous mutant mouse corneas               #
+# Created: June 27, 2019						                                           #
+# Purpose: Combine differential expression data for pairwise contrasts between #
+#          wildtype and Pax6 Het Lens epithelium with DE data from             #
+#          Lens Epithelium at 6, 24 and 48 hours PCS.  Data from a total of    #
+#          five pariwise contrasts is concatenated into a single "tidy" table  #
+#                                                                              #
 ################################################################################
 
 # Setup Workspace
 library('openxlsx')
+library('dplyr')
 wd<-getwd()
-source('Process_GSE29402.R')
-gseDEG<-deg
-pax6DEG<-read.xlsx('Pax6_Cornea_DEG.xlsx')
+data_dir<-paste(wd, "data_files", sep="/")
 
-# filter pax6DEG for significant genes
+# Function to select one row from a set of duplicates.  For any
+# duplicate symbol, the record with the greatest absolute logFC is
+# retained and all others are discarded
+uniqueMaxLfc<-function(df, idc="MGI.symbol", lfc="logFC", fdr="FDR"){
+  names(df)[grep(idc, names(df))]<-"idc"
+  names(df)[grep(lfc, names(df))]<-"lfc"
+  names(df)[grep(fdr, names(df))]<-"fdr"
+  
+  df<-df %>% 
+    group_by(idc) %>%
+    top_n(1, abs(lfc))  %>% 
+    group_by(idc) %>%
+    filter(row_number(lfc) == 1)
+  
+  names(df)[grep("idc", names(df))]<-idc
+  names(df)[grep("lfc", names(df))]<-lfc
+  names(df)[grep("fdr", names(df))]<-fdr
+  return (data.frame(df, stringsAsFactors=F))
+}
+
+# Load in data files
+pax6DEG<-read.xlsx(paste(data_dir,'Cuffdiff1_max.xlsx', sep="/"))
+dbi<-list()
+for(f in list.files(data_dir, pattern="_expressedTags-all.txt")){
+  c<-gsub("_expressedTags-all.txt","", f)
+  file<-paste(data_dir,f, sep="/")
+  dbi[[c]]<-read.table(
+      file, sep="\t",
+      header= T, quote="", stringsAsFactors = F
+  )
+  names(dbi[[c]])[grep('GeneID$', names(dbi[[c]]))]<-'MGI.symbol'
+  dbi[[c]]$Lab<-"DBI"
+  dbi[[c]]$experiment<-"PCO"
+  dbi[[c]]<-uniqueMaxLfc(dbi[[c]])
+}
+
+dna<-list()
+for(f in list.files(data_dir, pattern="WT0vs")){
+  c<-gsub(".xlsx","", f)
+  file<-paste(data_dir,f, sep="/")
+  dna[[c]]<-read.xlsx(file)
+  names(dna[[c]])[grep('^gene$', names(dna[[c]]))]<-'MGI.symbol'
+  names(dna[[c]])[grep('q_value', names(dna[[c]]))]<-'FDR'
+  names(dna[[c]])[grep('sample_1', names(dna[[c]]))]<-'Group_1'
+  names(dna[[c]])[grep('sample_2', names(dna[[c]]))]<-'Group_2'
+  names(dna[[c]])[grep('value_1', names(dna[[c]]))]<-'Avg1'
+  names(dna[[c]])[grep('value_2', names(dna[[c]]))]<-'Avg2'
+  dna[[c]]$Lab<-"DNA"
+  dna[[c]]$description<-NA
+  dna[[c]]$ensembl_gene_id<-NA
+  dna[[c]]$experiment<-"PCO"
+  dna[[c]]$logFC<-log2(dna[[c]]$Avg2/dna[[c]]$Avg1)
+  dna[[c]]<-dna[[c]] %>% filter(status=="OK")
+}
+
+# Fix pax6DEG Column Headers
 names(pax6DEG)[grep('^gene$', names(pax6DEG))]<-'MGI.symbol'
 names(pax6DEG)[grep('q_value', names(pax6DEG))]<-'FDR'
-pax6DEG$experiment<-'Pax6Cornea'
-pax6DEG$logFC<-log2(pax6DEG$value_1/pax6DEG$value_2)
-pax6DEG<-pax6DEG %>% filter(abs(logFC) > 1, FDR < 0.05)
+names(pax6DEG)[grep('sample_1', names(pax6DEG))]<-'Group_1'
+names(pax6DEG)[grep('sample_2', names(pax6DEG))]<-'Group_2'
+names(pax6DEG)[grep('value_1', names(pax6DEG))]<-'Avg1'
+names(pax6DEG)[grep('value_2', names(pax6DEG))]<-'Avg2'
+pax6DEG$Lab<-"DNA"
+pax6DEG$description<-NA
+pax6DEG$ensembl_gene_id<-NA
+pax6DEG$experiment<-'Pax6Epi'
+pax6DEG$logFC<-log2(pax6DEG$Avg2/pax6DEG$Avg1)
+pax6DEG<-pax6DEG %>% filter(status=="OK")
 
-# filter DEG from GSE29402 -- this is a very crude filter.
-minExp<-log(0.01*(2^max(gseDEG$AveExpr)),2)
-names(gseDEG)[grep('adj.P.Val', names(gseDEG))]<-'FDR'
-# names(gseDEG)[grep('Conjunctiva_Mean', names(gseDEG))]<-'value_1'
-# names(gseDEG)[grep('Cornea_Mean', names(gseDEG))]<-'value_2'
-gseDEG<- gseDEG %>%
-	 filter(abs(logFC)> 1, FDR < 0.05)
-	 	
-gseDEG<-gseDEG %>%
-	       group_by(Gene.Symbol) %>%
-	       filter(abs(logFC) == max(abs(logFC)))
-gseDEG$experiment<-'GSE29402'
+# Validate MGI.Symbol as primary key in each data set
+x<-list(pax6DEG, dbi[[1]], dbi[[2]], dna[[1]], dna[[2]])
+for (i in 1:5){
+  print(
+    paste("Rows in ",i, ":", nrow(x[[i]]), 
+          "Unique MGI.Symbol: ", length(unique(x[[i]]$MGI.symbol)))
+  )
+}
+
+#
+ag_master<-data.frame(stringsAsFactors = F)
+ss_master<-data.frame(stringsAsFactors = F)
+
+for (d in names(dbi)){
+  contrast<-d
+  
+  # Load in DEGs
+  dg<-dbi[[d]]
+  dg$Lab<-"DBI"
+  samples<-names(dg)[grep("_GeneCount.cpm", names(dg))]
+  
+  print(paste("############ FILTER DEG: ",contrast, "##########"))	
+  
+  # Setup for RPKM Filtering Criteria
+  samples<-gsub("_GeneCount.cpm", "_RPKM", samples)
+  print(paste("RPKM Filtering Cols:", paste(samples, collapse=" "), sep=" "))
+  dg$Avg1<-apply(dg[,samples[1:3]], 1, mean)
+  dg$Avg2<-apply(dg[,samples[4:6]], 1, mean)
+  
+  dg$Group_1<-unlist(strsplit(contrast,"_vs_"))[1]
+  dg$Group_2<-unlist(strsplit(contrast,"_vs_"))[2]
+  
+  # Get Statistically Significant Genes
+  ds<-dg %>% filter(abs(logFC) > 1 & FDR < 0.05) 
+
+  # Reorder Columns For readability, drop sample specific columns
+  cols<-c("MGI.symbol",
+          "ensembl_gene_id", 
+          "description", "Lab", "experiment",
+          "logFC", "FDR", "Group_1", 
+          "Group_2", "Avg1", "Avg2"
+  )
+  ag_master<-bind_rows(
+    ag_master,
+    dg<-dg[,cols]
+  )
+  
+  ss_master<-bind_rows(
+    ss_master,
+    ds<-ds[,cols]
+  )
+}
+
+
+for (d in names(dna)){
+  contrast<-d
+  
+  # Load in DEGs
+  dg<-dna[[d]]
+  
+  print(paste("############ FILTER DEG: ",contrast, "##########"))	
+  
+  # Fix Condition labels to match DBI labels
+  dg$Group_1<-gsub("W_h0", "WT_0_Hour", dg$Group_1)
+  dg$Group_2<-gsub("W_h6", "WT_6_Hour",  
+                   gsub("W_h24", "WT_24_Hour", dg$Group_2)
+              )
+  
+  # Get Statistically Significant Genes
+  ds<-dg %>% filter(abs(logFC) > 1 & FDR < 0.05) 
+  
+  # Reorder Columns For readability, drop sample specific columns
+  cols<-c("MGI.symbol",
+          "ensembl_gene_id", 
+          "description", "Lab", "experiment",
+          "logFC", "FDR", "Group_1", 
+          "Group_2", "Avg1", "Avg2"
+  )
+  ag_master<-bind_rows(
+    ag_master,
+    dg<-dg[,cols]
+  )
+  
+  ss_master<-bind_rows(
+    ss_master,
+    ds<-ds[,cols]
+  )
+  
+}
+
+
+
+
+ds<-pax6DEG %>% filter(abs(logFC) > 1 & FDR < 0.05) 
+
+# Reorder Columns For readability, drop sample specific columns
+cols<-c("MGI.symbol",
+        "ensembl_gene_id", 
+        "description", "Lab", # "experiment",
+        "logFC", "FDR", "Group_1", 
+        "Group_2", "Avg1", "Avg2"
+)
+ag_master<-bind_rows(
+  ag_master,
+  pax6DEG<-pax6DEG[,cols]
+)
+
+ss_master<-bind_rows(
+  ss_master,
+  ds<-ds[,cols]
+)
+
+print(
+  paste(
+    "Row Count Verification (expect 0):",
+    nrow(ag_master) - nrow(pax6DEG) - nrow(dbi[[1]]) -nrow(dbi[[2]]) -nrow(dna[[1]]) -nrow(dna[[2]])
+  )
+)
+save(ag_master, ss_master, dbi, dna, pax6DEG, file = "master_tables.Rdata")
+
+
+
+joinDegLists<-function(df1, df2){
+  allResults<-as.data.frame(
+    inner_join(
+      gseDEG %>%
+        filter(MGI.symbol %in% intersect(gseDEG$MGI.symbol, pax6DEG$MGI.symbol)) %>%
+        dplyr::select(
+          Human_Gene=Gene.Symbol,
+          Human_Ensembl_ID=Gene.stable.ID,
+          Human_Description=Gene.description,
+          GSE29402_Cornea_Avg_Intensity=Cornea_Mean,
+          GSE29402_Conjuncitva_Avg_Intensity=Conjunctiva_Mean,
+          GSE29402_logFC=logFC,
+          GSE29402_FDR=FDR,
+          Mouse_Gene=MGI.symbol,
+          Mouse_Ensembl_ID=Gene.stable.ID.1,
+          Mouse_Description=MGI.description
+        ),
+      pax6DEG %>%
+        filter(MGI.symbol %in% intersect(gseDEG$MGI.symbol, pax6DEG$MGI.symbol)) %>%
+        dplyr::select(
+          Mouse_Gene=MGI.symbol,
+          Pax6_Heterozygote_Avg_FPKM=value_1,
+          Pax6_WT_Littermate_Avg_FPKM=value_2,
+          Pax6Cornea_logFC=logFC, 
+          Pax6Cornea_FDR=FDR
+        ),
+      by='Mouse_Gene'
+      
+    ),
+    stringsAsFactors=F
+  )
+}
+
+
+
+
 
 
 allResults<-as.data.frame(
@@ -183,5 +393,6 @@ saveWorkbook(wb, paste("Pax6Cornea_GSE29402_Contrast_Results.xlsx", sep="_"), ov
 print(sessionInfo())
 
 
+### NewBorn GEO Contrast 
 
 
