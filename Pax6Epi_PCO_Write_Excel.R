@@ -1,0 +1,127 @@
+################################################################################
+# File: Pax6Epi_PCO_Write_Excel.R                                              #
+# Author: Adam Faranda                                                         #
+# Created: June 28, 2019                                                       #
+# Purpose: Write overlapping differential expression results to spreadsheets   #
+#                                                                              #
+################################################################################
+
+# Setup Workspace
+library('openxlsx')
+library('dplyr')
+source('Pax6Epi_PCO_Compare_Overlap.R')
+wd<-getwd()
+master<-list.files(pattern="master_tables")
+if (length(master) > 0) { 
+  load(master[1])
+} else {
+  source("Pax6Epi_PCO_Build_Master_Tables.R")
+}
+
+
+# Fix group variable from Pax6 Experiment
+ss_master$Group_1<-gsub("PAX6LEplusplus", "plusplus", ss_master$Group_1)
+ag_master$Group_1<-gsub("PAX6LEplusplus", "plusplus", ag_master$Group_1)
+ss_master$Group_2<-gsub("PAX6LEplusminus", "plusminus", ss_master$Group_2)
+ag_master$Group_2<-gsub("PAX6LEplusminus", "plusminus", ag_master$Group_2)
+
+# Build annotation table
+an<-ss_master %>% 
+  group_by(MGI.symbol) %>% 
+  filter(row_number(MGI.symbol) == 1) %>%
+  select(MGI.symbol, ensembl_gene_id, description)
+an<-data.frame(an, stringsAsFactors = F)
+
+# list of filter condtions to select comparison subsets of ss_master
+evaluationList<-list(
+  c("DNA", "WT_6_Hour"),
+  c("DNA", "WT_24_Hour"),
+  c("DBI", "WT_24_Hour"),
+  c("DBI", "WT_48_Hour")
+)
+Ee<-evaluationList[[1]]
+
+# First Contrast is Wildtype vs Pax6 Heterozygous lens epithelium
+dg1<-ss_master %>% filter(Lab == "DNA", Group_2 == "plusminus")
+e<-evaluationList[1]
+
+
+# Iterate through a list of second contrasts from the PCO data set
+for(e in evaluationList){
+  
+  dg2<-ss_master %>% filter(Lab == e[1], Group_2 == e[2])
+  
+  # Query joins two pairwise contrasts
+  allResults<-query(dg1, dg2)
+  bioResults<-bioSig(allResults)
+  
+  # Get individual deg summary tables
+  degTable.dg1<-degSummary(dg1)
+  degTable.dg2<-degSummary(dg2)
+  
+  # Get intersection tables and directional subsets
+  stat.tables<-subsetTables(
+    allResults, descname = T, annot = an, 
+    Contrast_1 = "Pax6_LE", Contrast_2= e[2]
+  )
+  bio.tables<-subsetTables(
+    bioResults, descname = T, annot = an, stat=F,
+    Contrast_1 = "Pax6_LE", Contrast_2= e[2]                    
+  )
+  
+  # Get contingency tables for intersection
+  stat.inx<-tabulateOverlap(stat.tables, rename = T)
+  bio.inx <-tabulateOverlap(bio.tables, rename = T)
+  
+
+  print(degTable.dg1)
+  print(degTable.dg2)
+
+  print(stat.inx)
+  print(bio.inx)
+  print(
+    paste(
+      e[1], e[2], "All Results:", nrow(allResults),
+      "Bio Results:", nrow(bioResults) 
+    )
+  )
+}
+
+
+x<-ss_master %>% group_by(MGI.symbol) %>% top_n(1,)
+
+stat.tables<-subsetTables(allResults, descname = annot=)
+
+# Build Excel Workbook
+wb<-loadWorkbook(
+        list.files(pattern='Contrast_Description.xlsx')
+  )
+
+
+
+# Tabulate Statistically Significant, and Biologically Significant Genes from
+writeData(wb, 1, degTable.pax6, startCol=2, startRow=37,colNames=F) # Add DEG counts to main page
+
+
+# Tabulate Statistically Significant Intersection between the two data sets
+writeData(wb, 1, stat.Intersect, startCol=3, startRow=42,colNames=F)
+
+# Tabulate Biologically Significant Intersection between the two data sets
+writeData(wb, 1, biol.Intersect, startCol=3, startRow=46,colNames=F)
+
+tx<-createStyle(numFmt="@")
+for(i in names(tables)){
+  addWorksheet(wb,i)
+  print(nrow(tables[[i]]))
+  cells<-expand.grid(row=nrow(tables[[i]]), col=grep("_Gene", names(tables[[i]])))
+  addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
+  writeData(wb, i, tables[[i]])
+}
+saveWorkbook(wb, paste("Pax6Cornea_GSE29402_Contrast_Results.xlsx", sep="_"), overwrite=T)
+
+print(sessionInfo())
+
+
+### NewBorn GEO Contrast 
+
+
