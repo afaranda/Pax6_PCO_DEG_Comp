@@ -162,7 +162,7 @@ subsetTables<-function(
   
   if(unlog){
     df$dg1.lfc<-ifelse(df$dg1.lfc >= 0, 2^df$dg1.lfc, -1/2^df$dg1.lfc)
-    df$dg1.lfc<-ifelse(df$dg1.lfc >= 0, 2^df$dg1.lfc, -1/2^df$dg1.lfc)
+    df$dg2.lfc<-ifelse(df$dg2.lfc >= 0, 2^df$dg2.lfc, -1/2^df$dg2.lfc)
   }
   if(!is.null(annot)){
     if(any(grepl(id_col, names(annot)))){

@@ -7,6 +7,7 @@
 ################################################################################
 
 # Setup Workspace
+options(echo=F)
 library('openxlsx')
 library('dplyr')
 wd<-getwd()
@@ -64,14 +65,14 @@ for(e in evaluationList){
   
   # Get intersection tables and directional subsets
   stat.tables<-subsetTables(
-    allResults, descname = T, annot = an,
+    allResults, descname = T, annot = an, unlog = T,
     Contrast_1 = "WTvP6", 
     Contrast_2= paste(
       "WT0v", gsub("_","",gsub("Hour","",e[2])), sep=""
     )
   )
   bio.tables<-subsetTables(
-    bioResults, descname = T, annot = an, stat=F,
+    bioResults, descname = T, annot = an, stat=F, unlog=T,
     Contrast_1 = "Pax6_LE", Contrast_2= paste(
       "WT0v", gsub("_","",gsub("_","",e[2])), sep=""
     )                  
