@@ -136,7 +136,7 @@ degSummary<-function(
 # Extract directional subsets of statistically significant genes
 subsetTables<-function(
   df,                       # Data frame with a joined pair of results
-  id_col="MGI.symbol",       # Unique Identifier for this gene
+  id_col="MGI.symbol",      # Unique Identifier for this gene
   Contrast_1 = "LE",        # Name of the first contrast in df
   Contrast_2 = "PCO",       # Name of the second contrast in df
   dg1="dg1",                # Prefix for contrast 1
@@ -150,7 +150,8 @@ subsetTables<-function(
   stat = T,                 # Whether to use 'Stat' or 'Bio' naming scheme
   unlog = T,                # Whether to report absolute or log2 fold changes
   descname = F,             # Use original, or descriptive attribute names
-  annot = NULL              # Optionally provide table (keyed on ID)
+  annot = NULL,             # Optionally provide table (keyed on ID)
+  dropGroup = T             # Drop or keep group label columns
 ){
   # Standardize column headers
   cols<-c(lfc=lfc, fdr=fdr, g1=g1, g2=g2, a1=a1, a2=a2)
@@ -178,20 +179,20 @@ subsetTables<-function(
   if (stat){
     tables<-list(
       `Stat Sig Intersection`=df,
-      `SS Down C1 Up C2` = df %>% filter(dg1.lfc < 0, dg2.lfc > 0 ),
-      `SS Down C1 Down C2` = df %>% filter(dg1.lfc < 0, dg2.lfc < 0 ),
+      `SS Dn C1 Up C2` = df %>% filter(dg1.lfc < 0, dg2.lfc > 0 ),
+      `SS Dn C1 Dn C2` = df %>% filter(dg1.lfc < 0, dg2.lfc < 0 ),
       `SS Up C1 Up C2` = df %>% filter(dg1.lfc > 0, dg2.lfc > 0 ),
-      `SS Up C1 Down C2` = df %>% filter(dg1.lfc > 0, dg2.lfc < 0 )
+      `SS Up C1 Dn C2` = df %>% filter(dg1.lfc > 0, dg2.lfc < 0 )
     )
     
   # Use if the data tables submitted via df are biologically significant
   } else {
     tables<-list(
       `Bio Sig Intersection`=df,
-      `BS Down C1 Up C2`= df %>% filter(dg1.lfc < 0, dg2.lfc > 0 ),
-      `BS Down C1 Down C2`= df %>% filter(dg1.lfc < 0, dg2.lfc < 0 ),
+      `BS Dn C1 Up C2`= df %>% filter(dg1.lfc < 0, dg2.lfc > 0 ),
+      `BS Dn C1 Dn C2`= df %>% filter(dg1.lfc < 0, dg2.lfc < 0 ),
       `BS Up C1 Up C2`= df %>% filter(dg1.lfc > 0, dg2.lfc > 0 ),
-      `BS Up C1 Down C2`= df %>% filter(dg1.lfc > 0, dg2.lfc < 0 )
+      `BS Up C1 Dn C2`= df %>% filter(dg1.lfc > 0, dg2.lfc < 0 )
     )
   }
   
@@ -221,20 +222,51 @@ subsetTables<-function(
     )
     
     for (t in names(tables)){
-      sloc<-names(cols)
-      names(sloc)<-cols
-      tables[[t]]<-dfSubname(tables[[t]], sloc)
+      if(dropGroup){
+        sloc<-names(cols)
+        names(sloc)<-cols
+        keep<-setdiff(
+          names(tables[[t]]), 
+          sloc[c(grep("\\.g1$", sloc), grep("\\.g2$", sloc))]
+        )
+        sloc<-sloc[-c(grep("\\.g1$", sloc), grep("\\.g2$", sloc)) ]
+        print(keep)
+        tables[[t]]<-tables[[t]][, keep]
+        tables[[t]]<-dfSubname(tables[[t]], sloc)
+        
+      } else {
+        sloc<-names(cols)
+        names(sloc)<-cols
+        tables[[t]]<-dfSubname(tables[[t]], sloc)
+      }
     }
     
   } else {
     for(t in names(tables)){
-      sloc<-names(cols)
-      frp<-names(prf)
-      names(sloc)<-cols
-      names(frp)<-prf
-      tables[[t]]<-dfSubname(tables[[t]], sloc)
-      tables[[t]]<-dfSubname(tables[[t]], frp)
-      
+      if(dropGroup){
+        sloc<-names(cols)
+        frp<-names(prf)
+        names(sloc)<-cols
+        names(frp)<-prf
+        
+        drop<-c(
+          grep("\\.g1$", names(tables[[t]])), 
+          grep("\\.g2$", names(tables[[t]]))
+        )
+        keep<-names(tables[[t]])[-drop]
+        print(keep)
+        sloc<-sloc[-c(grep("g1$", sloc), grep("g2$", sloc))]
+        tables[[t]]<-dfSubname(tables[[t]], sloc)
+        tables[[t]]<-dfSubname(tables[[t]], frp)
+        
+      } else {
+        sloc<-names(cols)
+        frp<-names(prf)
+        names(sloc)<-cols
+        names(frp)<-prf
+        tables[[t]]<-dfSubname(tables[[t]], sloc)
+        tables[[t]]<-dfSubname(tables[[t]], frp)
+      }
     }
   }
   tables<-append(

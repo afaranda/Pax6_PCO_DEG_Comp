@@ -64,14 +64,18 @@ for(e in evaluationList){
   
   # Get intersection tables and directional subsets
   stat.tables<-subsetTables(
-    allResults, descname = T, annot = an, 
-    Contrast_1 = "Pax6_LE", Contrast_2= e[2]
+    allResults, descname = T, annot = an,
+    Contrast_1 = "WTvP6", 
+    Contrast_2= paste(
+      "WT0v", gsub("_","",gsub("Hour","",e[2])), sep=""
+    )
   )
   bio.tables<-subsetTables(
     bioResults, descname = T, annot = an, stat=F,
-    Contrast_1 = "Pax6_LE", Contrast_2= e[2]                    
+    Contrast_1 = "Pax6_LE", Contrast_2= paste(
+      "WT0v", gsub("_","",gsub("_","",e[2])), sep=""
+    )                  
   )
-  
   # Get contingency tables for intersection
   stat.inx<-tabulateOverlap(stat.tables, rename = T)
   bio.inx <-tabulateOverlap(bio.tables, rename = T)
@@ -96,37 +100,57 @@ for(e in evaluationList){
     )
   )
   
+  # Delete "Contrasts tab from directional subsets
+  stat.tables["Contrasts"]<-NULL
+  bio.tables["Contrasts"]<-NULL
+  
   # Tabulate Statistically Significant, and Biologically Significant Genes from each contrast
   writeData(wb, 1, degTable.dg1, startCol=2, startRow=32,colNames=F) # Add DEG counts to main page
   writeData(wb, 1, degTable.dg2, startCol=2, startRow=37,colNames=F) # Add DEG counts to main page
   
   # Tabulate Statistically Significant Intersection between the two data sets
-  writeData(wb, 1, stat.inx, startCol=3, startRow=42,colNames=F)
+  writeData(wb, 1, stat.inx, startCol=3, startRow=42,colNames=F, rowNames = F)
   
   # Tabulate Biologically Significant Intersection between the two data sets
-  writeData(wb, 1, bio.inx, startCol=3, startRow=46,colNames=F)
+  writeData(wb, 1, bio.inx, startCol=3, startRow=46,colNames=F, rowNames = F)
   
   tx<-createStyle(numFmt="TEXT")
+  
+  # Add statistically significant directional subsets to workbook object
   for(i in names(stat.tables)){
     addWorksheet(wb,i)
     print(nrow(stat.tables[[i]]))
-    cells<-expand.grid(row=nrow(stat.tables[[i]]), col=grep("MGI.symbol", names(stat.tables[[i]])))
+    cells<-expand.grid(
+      row=nrow(stat.tables[[i]]), 
+      col=grep("MGI.symbol", 
+               names(stat.tables[[i]])
+      )
+    )
     addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
     writeData(wb, i, stat.tables[[i]])
   }
   
+  # Add biologically significant directional subsets to workbook object
+  for(i in names(bio.tables)){
+    addWorksheet(wb,i)
+    print(nrow(bio.tables[[i]]))
+    cells<-expand.grid(
+      row=nrow(bio.tables[[i]]), 
+      col=grep("MGI.symbol", 
+               names(bio.tables[[i]])
+      )
+    )
+    addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
+    writeData(wb, i, bio.tables[[i]])
+  }
+  
+  # Save workbooks to file  
   fn<-paste("WTLEvP6LE",e[1],e[2], sep="_")
   fn<-paste(fn, ".xlsx", sep="")
   saveWorkbook(wb, paste(out_dir,fn, sep="/"), overwrite=T)
   
 }
-
-
-x<-ss_master %>% group_by(MGI.symbol) %>% top_n(1,)
-
 print(sessionInfo())
 
-
-### NewBorn GEO Contrast 
 
 
