@@ -1,0 +1,50 @@
+
+R version 3.4.4 (2018-03-15) -- "Someone to Lean On"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ################################################################################
+> # File: Pax6Epi_PCO_Write_Excel.R                                              #
+> # Author: Adam Faranda                                                         #
+> # Created: June 28, 2019                                                       #
+> # Purpose: Write overlapping differential expression results to spreadsheets   #
+> #                                                                              #
+> ################################################################################
+> 
+> # Setup Workspace
+> library('openxlsx')
+> library('dplyr')
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> wd<-getwd()
+> data_dir<-paste(wd, "data_files", sep="/")
+> out_dir<-paste(wd, "analysis_results", sep="/")
+> source('Pax6Epi_PCO_Compare_Overlap.R')
+Error in uniqueMaxLfc(dbi[[c]]) : could not find function "uniqueMaxLfc"
+Calls: source ... eval -> eval -> source -> withVisible -> eval -> eval
+Execution halted

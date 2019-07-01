@@ -8,7 +8,31 @@
 #          five pariwise contrasts is concatenated into a single "tidy" table  #
 #                                                                              #
 ################################################################################
+# Setup Workspace
+library('openxlsx')
+library('dplyr')
+wd<-getwd()
+data_dir<-paste(wd, "data_files", sep="/")
 
+# Function to select one row from a set of duplicates.  For any
+# duplicate symbol, the record with the greatest absolute logFC is
+# retained and all others are discarded
+uniqueMaxLfc<-function(df, idc="MGI.symbol", lfc="logFC", fdr="FDR"){
+  names(df)[grep(idc, names(df))]<-"idc"
+  names(df)[grep(lfc, names(df))]<-"lfc"
+  names(df)[grep(fdr, names(df))]<-"fdr"
+  
+  df<-df %>% 
+    group_by(idc) %>%
+    top_n(1, abs(lfc))  %>% 
+    group_by(idc) %>%
+    filter(row_number(lfc) == 1)
+  
+  names(df)[grep("idc", names(df))]<-idc
+  names(df)[grep("lfc", names(df))]<-lfc
+  names(df)[grep("fdr", names(df))]<-fdr
+  return (data.frame(df, stringsAsFactors=F))
+}
 
 # Load in data files
 pax6DEG<-read.xlsx(paste(data_dir,'Cuffdiff1_max.xlsx', sep="/"))

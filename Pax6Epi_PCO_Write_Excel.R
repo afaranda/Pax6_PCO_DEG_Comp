@@ -9,10 +9,10 @@
 # Setup Workspace
 library('openxlsx')
 library('dplyr')
-source('Pax6Epi_PCO_Compare_Overlap.R')
 wd<-getwd()
 data_dir<-paste(wd, "data_files", sep="/")
 out_dir<-paste(wd, "analysis_results", sep="/")
+source('Pax6Epi_PCO_Compare_Overlap.R')
 
 master<-list.files(pattern="master_tables")
 if (length(master) > 0) { 
@@ -21,7 +21,7 @@ if (length(master) > 0) {
   source("Pax6Epi_PCO_Build_Master_Tables.R")
 }
 
-
+print(data_dir)
 # Fix group variable from Pax6 Experiment
 ss_master$Group_1<-gsub("PAX6LEplusplus", "plusplus", ss_master$Group_1)
 ag_master$Group_1<-gsub("PAX6LEplusplus", "plusplus", ag_master$Group_1)
