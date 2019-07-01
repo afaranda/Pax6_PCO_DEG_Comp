@@ -145,7 +145,7 @@ for(e in evaluationList){
   }
   
   # Save workbooks to file  
-  fn<-paste("WTLEvP6LE",e[1],e[2], sep="_")
+  fn<-paste("WTvP6",e[1],e[2], sep="_")
   fn<-paste(fn, ".xlsx", sep="")
   saveWorkbook(wb, paste(out_dir,fn, sep="/"), overwrite=T)
   
