@@ -11,6 +11,9 @@ library('openxlsx')
 library('dplyr')
 source('Pax6Epi_PCO_Compare_Overlap.R')
 wd<-getwd()
+data_dir<-paste(wd, "data_files", sep="/")
+out_dir<-paste(wd, "analysis_results", sep="/")
+
 master<-list.files(pattern="master_tables")
 if (length(master) > 0) { 
   load(master[1])
@@ -39,7 +42,7 @@ evaluationList<-list(
   c("DBI", "WT_24_Hour"),
   c("DBI", "WT_48_Hour")
 )
-Ee<-evaluationList[[1]]
+
 
 # First Contrast is Wildtype vs Pax6 Heterozygous lens epithelium
 dg1<-ss_master %>% filter(Lab == "DNA", Group_2 == "plusminus")
@@ -85,39 +88,41 @@ for(e in evaluationList){
       "Bio Results:", nrow(bioResults) 
     )
   )
+  
+  wb<-loadWorkbook(
+    paste(data_dir,
+          list.files(data_dir,pattern='Comparisons.xlsx'),
+          sep="/"
+    )
+  )
+  
+  # Tabulate Statistically Significant, and Biologically Significant Genes from each contrast
+  writeData(wb, 1, degTable.dg1, startCol=2, startRow=32,colNames=F) # Add DEG counts to main page
+  writeData(wb, 1, degTable.dg2, startCol=2, startRow=37,colNames=F) # Add DEG counts to main page
+  
+  # Tabulate Statistically Significant Intersection between the two data sets
+  writeData(wb, 1, stat.inx, startCol=3, startRow=42,colNames=F)
+  
+  # Tabulate Biologically Significant Intersection between the two data sets
+  writeData(wb, 1, bio.inx, startCol=3, startRow=46,colNames=F)
+  
+  tx<-createStyle(numFmt="TEXT")
+  for(i in names(stat.tables)){
+    addWorksheet(wb,i)
+    print(nrow(stat.tables[[i]]))
+    cells<-expand.grid(row=nrow(stat.tables[[i]]), col=grep("MGI.symbol", names(stat.tables[[i]])))
+    addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
+    writeData(wb, i, stat.tables[[i]])
+  }
+  
+  fn<-paste("WTLEvP6LE",e[1],e[2], sep="_")
+  fn<-paste(fn, ".xlsx", sep="")
+  saveWorkbook(wb, paste(out_dir,fn, sep="/"), overwrite=T)
+  
 }
 
 
 x<-ss_master %>% group_by(MGI.symbol) %>% top_n(1,)
-
-stat.tables<-subsetTables(allResults, descname = annot=)
-
-# Build Excel Workbook
-wb<-loadWorkbook(
-        list.files(pattern='Contrast_Description.xlsx')
-  )
-
-
-
-# Tabulate Statistically Significant, and Biologically Significant Genes from
-writeData(wb, 1, degTable.pax6, startCol=2, startRow=37,colNames=F) # Add DEG counts to main page
-
-
-# Tabulate Statistically Significant Intersection between the two data sets
-writeData(wb, 1, stat.Intersect, startCol=3, startRow=42,colNames=F)
-
-# Tabulate Biologically Significant Intersection between the two data sets
-writeData(wb, 1, biol.Intersect, startCol=3, startRow=46,colNames=F)
-
-tx<-createStyle(numFmt="@")
-for(i in names(tables)){
-  addWorksheet(wb,i)
-  print(nrow(tables[[i]]))
-  cells<-expand.grid(row=nrow(tables[[i]]), col=grep("_Gene", names(tables[[i]])))
-  addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
-  writeData(wb, i, tables[[i]])
-}
-saveWorkbook(wb, paste("Pax6Cornea_GSE29402_Contrast_Results.xlsx", sep="_"), overwrite=T)
 
 print(sessionInfo())
 
