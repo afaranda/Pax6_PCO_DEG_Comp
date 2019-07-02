@@ -146,10 +146,13 @@ for(e in evaluationList){
   }
   
   # Save workbooks to file  
-  fn<-paste("WTvP6",e[1],e[2], sep="_")
+  fn<-paste("WTvP6", paste(e[1],"_",
+    "WT0v", gsub("_","",gsub("Hour","",e[2])), sep=""
+  ), sep="_")
   fn<-paste(fn, ".xlsx", sep="")
-  saveWorkbook(wb, paste(out_dir,fn, sep="/"), overwrite=T)
-  
+  #Only uncomment the following line to re-generate spreadsheets!!!!
+  #saveWorkbook(wb, paste(outdir_dir,fn, sep="/"), overwrite=T) 
+  print(fn)
 }
 print(sessionInfo())
 
