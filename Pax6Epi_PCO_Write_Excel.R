@@ -7,7 +7,7 @@
 ################################################################################
 
 # Setup Workspace
-options(echo=F)
+options(echo=T)
 library('openxlsx')
 library('dplyr')
 wd<-getwd()
@@ -136,22 +136,55 @@ for(e in evaluationList){
     addWorksheet(wb,i)
     print(nrow(bio.tables[[i]]))
     cells<-expand.grid(
-      row=nrow(bio.tables[[i]]), 
-      col=grep("MGI.symbol", 
+      row=nrow(bio.tables[[i]]),
+      col=grep("MGI.symbol",
                names(bio.tables[[i]])
       )
     )
     addStyle(wb, i, rows=cells$row, cols=cells$col, style=tx)
     writeData(wb, i, bio.tables[[i]])
   }
-  
-  # Save workbooks to file  
+
+  # Save workbooks to file
   fn<-paste("WTvP6", paste(e[1],"_",
     "WT0v", gsub("_","",gsub("Hour","",e[2])), sep=""
   ), sep="_")
   fn<-paste(fn, ".xlsx", sep="")
   #Only uncomment the following line to re-generate spreadsheets!!!!
-  #saveWorkbook(wb, paste(outdir_dir,fn, sep="/"), overwrite=T) 
+  #saveWorkbook(wb, paste(outdir_dir,fn, sep="/"), overwrite=T)
+
+  # Print Venn Diagarams for
+  for(i in c("All", "Up", "Dn")){
+      fp<-gsub(".xlsx", paste("_",i,"_Venn.png", sep=""), fn)
+      if(i == "Up"){
+        sets<-list(
+          g1 = (dg1 %>% filter(logFC > 0))$MGI.symbol,
+          g2 = (dg2 %>% filter(logFC > 0))$MGI.symbol
+        )
+      } else if (i == "Dn"){
+        sets<-list(
+          g1 = (dg1 %>% filter(logFC < 0))$MGI.symbol,
+          g2 = (dg2 %>% filter(logFC < 0))$MGI.symbol
+        )
+      } else {
+        sets<-list(
+          g1 = dg1$MGI.symbol,
+          g2 = dg2$MGI.symbol
+        )
+      }
+      names(sets)<-c(
+        paste("WTvP6", i,sep="_"),
+        paste(
+          e[1],"_","WT0v",
+          gsub("_","",gsub("Hour","",e[2])),
+          "_",i,sep=""
+        )
+      )
+      png(filename = paste(out_dir, fp, sep="/"))
+      venn(sets, cexsn=1, cexil=1.2, zcolor="style")
+      dev.off()
+  }
+
   print(fn)
 }
 print(sessionInfo())
